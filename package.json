@@ -1,0 +1,44 @@
+
+{
+  "name": "cph",
+  "displayName": "Competitive Programming Helper",
+  "description": "A VS Code extension to help with competitive programming.",
+  "version": "0.0.1",
+  "publisher": "your-publisher-name",
+  "engines": {
+    "vscode": "^1.50.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:cph.fetchTestCases",
+    "onCommand:cph.runTestCases"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cph.fetchTestCases",
+        "title": "CPH: Fetch Test Cases"
+      },
+      {
+        "command": "cph.runTestCases",
+        "title": "CPH: Run Test Cases"
+      }
+    ],
+    "configuration": {
+      "properties": {
+        "cph.language.cpp.compile": {
+          "type": "string",
+          "default": "g++ -std=c++17 -o $fileNameWithoutExt $fileName",
+          "description": "Command to compile C++ files"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "fetch-test-case": "node path/to/fetchTestCase.js"
+  }
+}
+
