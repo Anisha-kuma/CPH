@@ -1,6 +1,7 @@
 const vscode = require('vscode');
-const fetch = require('node-fetch');
+const puppeteer = require('puppeteer');
 const path = require('path');
+const fs = require('fs');
 const { createDirectory, writeToFile } = require('../utils/fileManager');
 
 async function fetchTestCases() {
@@ -12,19 +13,51 @@ async function fetchTestCases() {
 
   try {
     vscode.window.showInformationMessage(`Fetching test cases from: ${url}`);
-    const response = await fetch(url, { timeout: 10000 }); // 10-second timeout
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+
+    // Launch Puppeteer
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    const page = await browser.newPage();
+
+    // Navigate to the URL
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+
+    // Wait for the `<pre>` elements to load
+    await page.waitForSelector('pre');
+
+    // Extract test cases
+    const testCases = await page.evaluate(() => {
+      const testCaseElements = Array.from(document.querySelectorAll('pre'));
+      const testCases = [];
+
+      testCaseElements.forEach(preElement => {
+        const strongElements = preElement.querySelectorAll('strong');
+        let input = '';
+        let output = '';
+
+        strongElements.forEach(strong => {
+          if (strong.innerText.includes('Input:')) {
+            input = strong.nextSibling?.nodeValue?.trim() || '';
+          } else if (strong.innerText.includes('Output:')) {
+            output = strong.nextSibling?.nodeValue?.trim() || '';
+          }
+        });
+
+        if (input && output) {
+          testCases.push({ input, output });
+        }
+      });
+
+      return testCases;
+    });
+
+    if (testCases.length === 0) {
+      throw new Error('No test cases found on the provided URL!');
     }
 
-    const html = await response.text();
-
-    // Extract test cases using regex
-    const testCaseRegex = /<pre>(.*?)<\/pre>/gs;
-    const matches = [...html.matchAll(testCaseRegex)];
-    const testCases = matches.map(match => match[1]);
-
-    // Save test cases
+    // Save test cases to files
     const testCaseDir = path.join(__dirname, 'testCases');
     createDirectory(testCaseDir);
 
@@ -32,22 +65,18 @@ async function fetchTestCases() {
       const inputFile = path.join(testCaseDir, `input_${index + 1}.txt`);
       const outputFile = path.join(testCaseDir, `output_${index + 1}.txt`);
 
-      const [input, output] = testCase.split('\n\n');
-      writeToFile(inputFile, input);
-      writeToFile(outputFile, output);
+      writeToFile(inputFile, testCase.input);
+      writeToFile(outputFile, testCase.output);
     });
 
     vscode.window.showInformationMessage('Test cases fetched and saved successfully!');
+    await browser.close();
   } catch (error) {
     console.error('Error while fetching test cases:', error);
     vscode.window.showErrorMessage(`Failed to fetch test cases: ${error.message}`);
   }
 }
 
-//module.exports = fetchTestCases;
-module.exports = function fetchTestCases() {
-  // Your implementation here
-  console.log('Fetching test cases...');
-};
+module.exports = fetchTestCases;
 
 
